@@ -7,25 +7,23 @@
 #include <sys/stat.h>
 #include <signal.h>
 #include <wait.h>
-#define MAX_BUFFER 1024*1024
+#define MAX_BUFFER 1024
 //server
 
-//struct ligada das tarefas ()
-typedef struct porfazer {
+//struct correspondente ao limite das transformações
+typedef struct comandos {
     int transform;// id da transformacao
-    int numero; //[indice] ordem das transformacoes no ficheiro output
-    int max; //numero max de concurrentes delimitada pelo ficheiro input
-    int done; // se já foi inserida na struct principal -> tarefas; 0 - nao, 1 - sim
-    struct porfazer *prox;
-} *Undone;
+    int max; //numero max de concurrentes
+    struct comandos *prox;
+} *Cmd;
 
 typedef struct tarefas {
-    int transform; // 0 - nop; 1 - bcompress; 2 - bdecompress; 3 - gcompress; 4 - gdecompress; 5 - encrypt; 6 - decrypt
+    int transform_atual; // 0 - nop; 1 - bcompress; 2 - bdecompress; 3 - gcompress; 4 - gdecompress; 5 - encrypt; 6 - decrypt
+    int *transformacoes; //lista total de transformaçoes a efetuar em inteiro com o mesmo indice acima
     int numero; //[índice] nº processo
     int processamento; // 0 - a espera; 1 - a processar
     pid_t pid;
     int concur; // nº atual em processamento
-    int max_concur; // equivalente ao max da struct input
     char *input_file; 
     char *output_file;
     struct tarefas *prox;
@@ -33,7 +31,7 @@ typedef struct tarefas {
 
 char*line[MAX_BUFFER]; // bufer que contem cada linha do ficheiro de comandos (cada comando e nº de concur maximas)
 Task tarefas; // Struct principal com todos os dados (status)
-Undone input; // Struct com as transformacoes do ficheiro input
+Cmd lim_cmd; // Struct com limites de cada transformação
 
 
 ssize_t readln(int fd,char* line, ssize_t size) { //lê as linhas do ficheiro
@@ -65,69 +63,90 @@ Task removeTask(int num) {
     }
     return tarefas;
 }
+
 //funcao que atualiza o estado de concurrentes de uma transformação, recebendo o indice da transformação 
-//e o possivel novo numero maximo de concurrencias
-int atualiza_concur(int indice_transform,int max_concur) {
+int atualiza_concur(int indice_transform) {
     Task atual = tarefas;
+    Task atual2 = tarefas;
+    Cmd lim = lim_cmd;
     int concur=0;
-    for (;atual!=NULL && atual->transform!=indice_transform;atual = atual->prox) {
+    while(lim!=NULL && lim->transform!=indice_transform)lim=lim->prox;
+    while(atual!=NULL && atual->transform_atual!=indice_transform)
+    {
         if(atual->processamento==1) concur++;
+        atual = atual->prox;
     }
-        for (;atual!=NULL && atual->transform!=indice_transform;atual = atual->prox) {
-        atual->concur=concur;
-        atual->max_concur=max_concur;
-        if(concur>max_concur) 
-        {
-        printf("Processo nº %d ultrapassa máximo concurrentes permitidas",indice_transform);
-        return 0;
-        }
+        for (;atual2!=NULL && atual2->transform_atual!=indice_transform;atual2 = atual2->prox) { //do i need this second one???
+        atual2->concur=concur;
+                if(atual2->concur>lim->max) 
+                {
+                printf("Processo nº %d ultrapassa máximo concurrentes permitidas",indice_transform);
+                free(atual);
+                return 0;
+                }
     }
+    tarefas = atual2; // nao sei se posso fazer assim ?
+    free(atual);
+    free(atual2);
+    free(lim);
     return 1;
 }
+
 //Verifica se outra transformação pode ser processada (verificando a concur e max_concur)
 int disponivel(int indice_transform) {
     Task atual = tarefas;
-    while(atual->transform != indice_transform) atual=atual->prox;
-    if (atual->concur<atual->max_concur) return 1;
-    else return 0;
+    Cmd lim = lim_cmd;
+    while(atual->transform_atual != indice_transform) atual=atual->prox;
+    while(lim->transform!=indice_transform) lim=lim->prox;
+    if (atual->concur < lim->max)
+    {
+        free(atual);
+        free(lim);
+        return 1;
+    }
+    else 
+    {
+        free(atual);
+        free(lim);
+        return 0;
+    }
 }
 
-//POR VER!!!!
-//funcao que lê a lista de comandos do ficheiro_input e põe na struct secundária *input*
-Task ler_input (char* path)
+//funcao que lê a lista de comandos e max de concurrencias e põe na struct secundária 'comandos'
+Task limite_comandos
+(char* path)
 {
-    int fd;
+    int fd,i=1;
     if ((fd = open(path, O_RDONLY)) < 0) {
         perror("Erro ao abrir ficheiro");
         _exit(-1);
     }
-    Filtro filtros = NULL;
-    Filtro temp = NULL;
-    Filtro ant = NULL;
+    lim_cmd = NULL;
+    Cmd temp = NULL;
+    Cmd ant = NULL;
 
     char *token;
-    while (readln(fd, line, 1) > 0) {
-        temp = malloc(sizeof(struct tarefas));
-        if (filtros == NULL) filtros = temp;
+    while (readln(fd, line, 1024) > 0) {
+        temp = malloc(sizeof(struct comandos));
+        if (lim_cmd == NULL) lim_cmd = temp;
         else ant->prox = temp;
         
         token = strtok(line, " ");
-        temp->nome_filtro = malloc(sizeof(char) * (strlen(token)+1));
-        strcpy(temp->nome_filtro, token);
-
+        if(token == "nop") temp->transform=0;
+        if(token == "bcompress") temp->transform=1;
+        if(token == "bdecompress") temp->transform=2;
+        if(token == "gcompress") temp->transform=3;
+        if(token == "gdecompress") temp->transform=4;
+        if(token == "encrypt") temp->transform=5;
+        if(token == "decrypt") temp->transform=6;
         token = strtok(NULL, " ");
-        temp->nome_executavel = malloc(sizeof(char) * (strlen(token)+1));
-        strcpy(temp->nome_executavel, token);
-
-        token = strtok(NULL, " ");
-        temp->maximo = atoi(token);
-
-        temp->atual = 0;
+        temp->max = atoi(token);
         temp->prox = NULL;
-
         ant = temp;
     }
-    return filtros;
+    free(temp);
+    free(ant);
+    return lim_cmd;
 }
 
 int main(int argc,char* argv[])
