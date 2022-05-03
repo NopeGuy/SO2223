@@ -33,7 +33,26 @@ char*line[MAX_BUFFER]; // bufer que contem cada linha do ficheiro de comandos (c
 Task tarefas; // Struct principal com todos os dados (status)
 Cmd lim_cmd; // Struct com limites de cada transformação
 
-
+int indice_trans (char* token)
+{
+    int res;
+    char*boda="bcompress";
+        if(strcmp(token,boda)==0) res=0;
+    boda="bcompress";
+        if(strcmp(token,boda)==0) res=1;
+    boda="bdecompress";
+        if(strcmp(token,boda)==0) res=2;
+    boda="gcompress";
+        if(strcmp(token,boda)==0) res=3;
+    boda="gdecompress";
+        if(strcmp(token,boda)==0) res=4;
+    boda="encrypt";
+        if(strcmp(token,boda)==0) res=5;
+    boda="decrypt";
+        if(strcmp(token,boda)==0) res=6;
+        else return 0;
+        return res;
+}
 ssize_t readln(int fd,char* line, ssize_t size) { //lê as linhas do ficheiro
 	ssize_t res = 0;
 	ssize_t i = 0;
@@ -113,10 +132,10 @@ int disponivel(int indice_transform) {
 }
 
 //funcao que lê a lista de comandos e max de concurrencias e põe na struct secundária 'comandos'
-Task limite_comandos
+Cmd limite_comandos
 (char* path)
 {
-    int fd,i=1;
+    int fd;
     if ((fd = open(path, O_RDONLY)) < 0) {
         perror("Erro ao abrir ficheiro");
         _exit(-1);
@@ -126,19 +145,13 @@ Task limite_comandos
     Cmd ant = NULL;
 
     char *token;
-    while (readln(fd, line, 1024) > 0) {
+    while (readln(fd, *line, 1024) > 0) {
         temp = malloc(sizeof(struct comandos));
         if (lim_cmd == NULL) lim_cmd = temp;
         else ant->prox = temp;
         
-        token = strtok(line, " ");
-        if(token == "nop") temp->transform=0;
-        if(token == "bcompress") temp->transform=1;
-        if(token == "bdecompress") temp->transform=2;
-        if(token == "gcompress") temp->transform=3;
-        if(token == "gdecompress") temp->transform=4;
-        if(token == "encrypt") temp->transform=5;
-        if(token == "decrypt") temp->transform=6;
+        token = strtok(*line, " ");
+        temp->transform=indice_trans(token);
         token = strtok(NULL, " ");
         temp->max = atoi(token);
         temp->prox = NULL;
@@ -147,6 +160,42 @@ Task limite_comandos
     free(temp);
     free(ant);
     return lim_cmd;
+}
+int tamanho_array (int* a)
+{   int arr=sizeof(a);
+    int res=arr/sizeof(int);
+    return res;
+}
+//traduz uma lista de comandos para uma lista de int correspondentes ao indice das transformacoes
+int* lista_trans
+(char* comando) 
+{
+    char* token;
+    int* res=malloc(sizeof(int)*30);
+    int i=0,j;
+    token=strtok(comando," ");
+    while(token!=NULL)
+    {
+        if((j=indice_trans(token)) != 0)
+        {
+            res[i]=j;
+            i++;
+        }
+        token=strtok(NULL," ");
+    }
+    if(realloc(res,sizeof(int)*i)==NULL)
+    perror("realloc->lista_trans");
+    return res;
+}
+//Para reverter a lista de transformacoes de modo a recuperar um ficheiro
+int* reverse(int s[]) {
+    int i, j, c;
+    for (i = 0, j = tamanho_array(s)-1; i<j; i++, j--) {
+        c = s[i];
+        s[i] = s[j];
+        s[j] = c;
+    }
+    return s;
 }
 
 int main(int argc,char* argv[])
