@@ -1,8 +1,8 @@
 # SOO2122
-Trabalho de SO 21/22
+Trabalho de SO 22/23
 Realizado por:
 
-Grupo 43 -
+Grupo XX -
 Luís Ferreira,
 Bernardo Lima,
 João Cardoso
