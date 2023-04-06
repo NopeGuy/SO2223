@@ -67,16 +67,16 @@ char* extraiComandoString(int argc,char** argv)
     for(int i=3;i<argc;i++)
     {
         strcat(cmd,argv[i]);
+        strcat(cmd," ");
     }
     return cmd;
 }
 char** extraiComandoArray(int argc, char*comando)
 {
     char*cmds[20];
-    strsep(&cmds," "); //eliminar a
     for(int i=0;i<argc-3;i++)
     {
-        strsep(&cmds," ");
+        cmds[i]=strsep(&comando," ");
     }
     return cmds;
 }
@@ -108,37 +108,48 @@ int main(int argc,char* argv[])
         cmd=extraiComandoString(argc,argv);
         pedido.commando=cmd;
 
-        char** cmds=malloc(sizeof(cmd)*argc);//verificar
+        char** cmds=malloc(sizeof(cmd)*argc);                               //ver isto
         cmds=extraiComandoArray(argc,cmd);
         
 
         if((pid=fork())==0)
         {
-            //falta escrever para o stdout que o programa iniciou com o PID x
+            //Escreve para o stdout o pid que está a correr
+            char resIn[20]="Running PID ";
+            char *sPID;
+            itoa(getpid(),sPID);
+            strcat(resIn,sPID);
+            write(STDOUT_FILENO,&resIn,sizeof(resIn));
+
+            //adiciona o tempo inicial da execução à struct pedido
             gettimeofday(&inicial,NULL);
             start=inicial.tv_usec;
             pedido.inicial=start;
-            execvp(argv[3],cmds);
-            //falta escrever o resultado da execucao para o stdout
+
+            execvp(cmds[0],cmds);
+                                        //falta escrever o resultado da execucao para o stdout
         }
         else
         {
+            //adiciona o pid ao pedido
             pedido.pid=pid;
+
             waitpid(pid,&status,0);
             if(WIFEXITED(status))
             {
+                //adiciona o tempo final ao pedido
                 gettimeofday(&final,NULL);
                 finish=final.tv_usec;
                 pedido.final=finish;
 
-                //resposta a enviar 
+                //envia para o stdout o tempo de execução do pedido
                 char resposta[20]="Ended in ";
                 char tempExec;
                 itoa(calcExec(pedido),tempExec);
                 strcat(tempExec,resposta);
                 strcat(" ms\n",resposta);
 
-                write(STDOUT_FILENO,resposta,sizeof(resposta));
+                write(STDOUT_FILENO,&resposta,sizeof(resposta));
             }
         }
 
