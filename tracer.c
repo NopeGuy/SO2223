@@ -102,21 +102,22 @@ int main(int argc,char* argv[])
         pedido pedido;
         int status=0;
         pid_t pid;
-        struct timeval inicial,final;
-        time_t start,finish;
+        struct timeval inicial,final;//struct auxiliar de gettimeofday
+        time_t start,finish;//valores finais da timeval (o que se quer)
         char* cmd;
-        char** cmds=malloc(sizeof(char)*argc);
-        
         cmd=extraiComandoString(argc,argv);
-        cmds=extraiComandoArray(argc,cmd);
         pedido.commando=cmd;
-        gettimeofday(&inicial,NULL);
-        start=inicial.tv_usec;
-        pedido.inicial=start;
+
+        char** cmds=malloc(sizeof(cmd)*argc);//verificar
+        cmds=extraiComandoArray(argc,cmd);
+        
 
         if((pid=fork())==0)
         {
             //falta escrever para o stdout que o programa iniciou com o PID x
+            gettimeofday(&inicial,NULL);
+            start=inicial.tv_usec;
+            pedido.inicial=start;
             execvp(argv[3],cmds);
             //falta escrever o resultado da execucao para o stdout
         }
