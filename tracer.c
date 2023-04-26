@@ -64,8 +64,9 @@ int criaLigacao(pid_t pid)
 // copia apenas a parte do comando relevante para posteriormente acopular à struct pedido
 char *extraiComandoString(int argc, char **argv)
 {
-    char *cmd = malloc(sizeof(argv));
-    cmd = "";
+    char *cmd = malloc(sizeof(char) * 1024); // Aloca um espaço inicial de 1024 bytes
+    memset(cmd, 0, sizeof(char) * 1024); // Preenche todo o espaço alocado com bytes nulos
+
     for (int i = 3; i < argc; i++)
     {
         strcat(cmd, argv[i]);
@@ -91,7 +92,7 @@ void extraiComandoArray(char** str, int argc, char* argv[]) {
                     break;  // Buffer overflow, stop copying
                 }
             }
-            (*str)[strlen(*str) - 1] = '\0';  // Remove last space
+            (*str)[strlen(*str)] = '\0';  // Remove last space
         }
     }
 }
@@ -153,12 +154,14 @@ int main(int argc, char *argv[])
             close(fildes[0]); // fechar o apontador de leitura (desnecessário)
 
             // Escreve para o stdout o pid que está a correr
-            char res[20]= "Running PID ";
-            char *resIn = res;
-            char *sPID="";
+            char *res=malloc(sizeof(char)*30);
+            strcat(res,"Running PID ");
+            char *sPID=malloc(sizeof(int)*5);
             itoa(getpid(), sPID);
-            strcat(resIn, sPID);
-            write(STDOUT_FILENO, &resIn, sizeof(resIn));
+            strcat(res, sPID);
+            strcat(res,"\n");
+            printf("%s\n",res);                                           //debug
+            write(STDOUT_FILENO, &res, sizeof(res));
 
             // adiciona o tempo inicial e o pid à struct
             gettimeofday(&inicial, NULL);
@@ -216,7 +219,7 @@ int main(int argc, char *argv[])
             }
             else
             {
-                printf("Erro de espera pelo processo filho %d", pid);
+                printf("Erro de espera pelo filho %d\n", pid);
                 fflush(stdout);
                 _exit(1);
             }
