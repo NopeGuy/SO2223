@@ -146,7 +146,7 @@ int main(int argc, char *argv[])
         cmd = extraiComandoString(argc, argv); // retira o "execute -u" do comando inicial
         pedido.commando = cmd;
 
-        char *cmds[100];
+        char **cmds=malloc(sizeof(cmd));
         extraiComandoArray(cmds,argc,argv); //poe dar merda
 
         // Criação de um pipe para comunicar o output para o pai
