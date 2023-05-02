@@ -11,6 +11,7 @@
 #include "tracer.h"
 
 // funcoes auxiliares
+#define MAX_STRING_LENGTH 20
 
 void reverse(char s[])
 {
@@ -24,6 +25,7 @@ void reverse(char s[])
         s[j] = c;
     }
 }
+
 void itoa(int n, char s[])
 {
     int i, sign;
@@ -33,6 +35,11 @@ void itoa(int n, char s[])
     i = 0;
     do
     {                          /* generate digits in reverse order */
+        if (i >= MAX_STRING_LENGTH) {
+            fprintf(stderr, "Error: string too long\n");
+            fflush(stderr);
+            exit(1);
+        }
         s[i++] = n % 10 + '0'; /* get next digit */
     } while ((n /= 10) > 0);   /* delete it */
     if (sign < 0)
@@ -40,6 +47,7 @@ void itoa(int n, char s[])
     s[i] = '\0';
     reverse(s);
 }
+
 
 // funções primarias
 
@@ -75,20 +83,20 @@ char *extraiComandoString(int argc, char **argv)
     return cmd;
 }
 void extraiComandoArray(char** str, int argc, char* argv[]) {
-    if (argc >= 3) {  // Check that there are at least 3 arguments
+    if (argc >= 4) {  // Check that there are at least 3 arguments
         // Allocate buffer for concatenated arguments
         int len = 0, i;
-        for (i = 2; i < argc; i++) {
+        for (i = 3; i < argc; i++) {
             len += strlen(argv[i]) + 1;  // Add length of argument and space
         }
         *str = malloc(len);  // Allocate buffer
         if (*str != NULL) {  // Check for allocation success
             (*str)[0] = '\0';  // Initialize buffer as empty string
-            // Concatenate all arguments after the first two to buffer
-            for (i = 2; i < argc; i++) {
+            // Concatenate all arguments from the third one to buffer
+            for (i = 3; i < argc; i++) {
                 strncat(*str, argv[i], len - strlen(*str) - 1);
                 strncat(*str, " ", len - strlen(*str) - 1);
-                if (strlen(*str) >= len - 1) {
+                if (strlen(*str) >= len - 1) {  
                     break;  // Buffer overflow, stop copying
                 }
             }
@@ -125,8 +133,9 @@ int main(int argc, char *argv[])
     // caso do execute
     if (argc > 2 && strcmp("execute", argv[1]) == 0 && strcmp(argv[2], "-u") == 0)
     {
+        // inteiro para guardar o stdout
+        int stdot;
         // Criação do pedido, já com o comando, status a 0
-
         pedido pedido;
         pedido.status = 0; // estado do pedido
         int status = 0;
@@ -138,7 +147,7 @@ int main(int argc, char *argv[])
         pedido.commando = cmd;
 
         char *cmds[100];
-        extraiComandoArray(cmds,argc,argv);
+        extraiComandoArray(cmds,argc,argv); //poe dar merda
 
         // Criação de um pipe para comunicar o output para o pai
 
@@ -154,14 +163,12 @@ int main(int argc, char *argv[])
             close(fildes[0]); // fechar o apontador de leitura (desnecessário)
 
             // Escreve para o stdout o pid que está a correr
-            char *res=malloc(sizeof(char)*30);
-            strcat(res,"Running PID ");
-            char *sPID=malloc(sizeof(int)*5);
+            char res[35]="Running PID ";
+            char sPID[20];
             itoa(getpid(), sPID);
             strcat(res, sPID);
             strcat(res,"\n");
-            printf("%s\n",res);                                           //debug
-            write(STDOUT_FILENO, &res, sizeof(res));
+            write(1, res, sizeof(res));
 
             // adiciona o tempo inicial e o pid à struct
             gettimeofday(&inicial, NULL);
@@ -175,9 +182,14 @@ int main(int argc, char *argv[])
             */
 
             // redirecionar o apontador do pipe fildes para o stdout
+
+            //guardar o apontador do stdout
+            dup2(STDOUT_FILENO,stdot);
+
+            //passar o fildes[1] a pontar para o stdout
             dup2(fildes[1], STDOUT_FILENO);
 
-            execvp(cmds[0], cmds);
+            execvp(cmds[0], cmds);                                           //está a peidar aqui aparently
             
             printf("Programa com o pid %d não concluído!\n", getpid());
             fflush(stdout);
@@ -188,7 +200,8 @@ int main(int argc, char *argv[])
         else
         {
             // escrever o output do programa do filho para o stdout
-
+            //repor o stdout
+            dup2(stdot,STDOUT_FILENO);
             close(fildes[1]); // fechar o extremo de escrita do output do comando
             char buff[1024];
             int bytes_read;
@@ -209,7 +222,7 @@ int main(int argc, char *argv[])
 
                 // envia para o stdout o tempo de execução do pedido
                 char resposta[20] = "Ended in ";
-                char *tempExec="";
+                char *tempExec=calloc(30,sizeof(char));          //poe dar merda
                 itoa(calcExec(pedido), tempExec);
                 strcat(tempExec, resposta);
                 strcat(" ms\n", resposta);
