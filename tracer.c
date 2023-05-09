@@ -69,7 +69,7 @@ int criaLigacao(pid_t pid)
     return -1;
 }
 
-// copia apenas a parte do comando relevante para posteriormente acopular à struct pedido
+// copia apenas a parte do argc relevante para posteriormente acopular à struct pedido
 char *extraiComandoString(int argc, char **argv)
 {
     char *cmd = malloc(sizeof(char) * 1024); // Aloca um espaço inicial de 1024 bytes
@@ -82,27 +82,16 @@ char *extraiComandoString(int argc, char **argv)
     }
     return cmd;
 }
-void extraiComandoArray(char** str, int argc, char* argv[]) {
-    if (argc >= 4) {  // Check that there are at least 3 arguments
-        // Allocate buffer for concatenated arguments
-        int len = 0, i;
-        for (i = 3; i < argc; i++) {
-            len += strlen(argv[i]) + 1;  // Add length of argument and space
-        }
-        *str = malloc(len);  // Allocate buffer
-        if (*str != NULL) {  // Check for allocation success
-            (*str)[0] = '\0';  // Initialize buffer as empty string
-            // Concatenate all arguments from the third one to buffer
-            for (i = 3; i < argc; i++) {
-                strncat(*str, argv[i], len - strlen(*str) - 1);
-                strncat(*str, " ", len - strlen(*str) - 1);
-                if (strlen(*str) >= len - 1) {  
-                    break;  // Buffer overflow, stop copying
-                }
-            }
-            (*str)[strlen(*str)] = '\0';  // Remove last space
-        }
+
+void extraiComandoArray(char **str, int argc, char *argv[])
+{
+    int i= 0,j = 3;
+    while(argv[j] && j <= argc){
+    str[i] = argv[j];
+    i++;
+    j++;
     }
+    str[i] = '\0';
 }
 
 // cria (struct)pedido com a informação
@@ -131,11 +120,12 @@ int main(int argc, char *argv[])
     */
 
     // caso do execute
+
     if (argc > 2 && strcmp("execute", argv[1]) == 0 && strcmp(argv[2], "-u") == 0)
     {
         // inteiro para guardar o stdout
         int stdot;
-        // Criação do pedido, já com o comando, status a 0
+        // Criação do pedido, já com o argc, status a 0
         pedido pedido;
         pedido.status = 0; // estado do pedido
         int status = 0;
@@ -143,10 +133,10 @@ int main(int argc, char *argv[])
         struct timeval inicial, final; // struct auxiliar de gettimeofday
         time_t start, finish;          // valores finais da timeval (o que se quer)
         char *cmd;
-        cmd = extraiComandoString(argc, argv); // retira o "execute -u" do comando inicial
+        cmd = extraiComandoString(argc, argv); // retira o "execute -u" do argc inicial
         pedido.commando = cmd;
 
-        char **cmds=malloc(sizeof(cmd));
+        char **cmds = malloc(sizeof(char *) * (argc - 3));
         extraiComandoArray(cmds,argc,argv); //poe dar merda
 
         // Criação de um pipe para comunicar o output para o pai
@@ -202,14 +192,14 @@ int main(int argc, char *argv[])
             // escrever o output do programa do filho para o stdout
             //repor o stdout
             dup2(stdot,STDOUT_FILENO);
-            close(fildes[1]); // fechar o extremo de escrita do output do comando
+            close(fildes[1]); // fechar o extremo de escrita do output do argc
             char buff[1024];
             int bytes_read;
             while ((bytes_read = read(fildes[0], &buff, sizeof(buff))) > 0)
             {
-                write(STDOUT_FILENO, &bytes_read, sizeof(bytes_read));
+                write(STDOUT_FILENO, &buff, bytes_read);
             }
-            close(fildes[0]); // fechar o extremo de leitura do output do comando do filho
+            close(fildes[0]); // fechar o extremo de leitura do output do argc do filho
 
             waitpid(pid, &status, 0);
             if (WIFEXITED(status))
@@ -224,8 +214,8 @@ int main(int argc, char *argv[])
                 char resposta[20] = "Ended in ";
                 char *tempExec=calloc(30,sizeof(char));          //poe dar merda
                 itoa(calcExec(pedido), tempExec);
-                strcat(tempExec, resposta);
-                strcat(" ms\n", resposta);
+                strcat(resposta, tempExec);
+                strcat(resposta, " ms\n");
 
                 write(STDOUT_FILENO, &resposta, sizeof(resposta));
                 _exit(0);
@@ -249,10 +239,10 @@ int main(int argc, char *argv[])
 
 
     }
-    // caso de comando inválido
+    // caso de argc inválido
     else
     {
-        printf("\nComando inválido, por favor execute o cliente novamente com um dos seguintes comandos:\n 1) execute -u <comando>\n2) status\n");
+        printf("\nComando inválido, por favor execute o cliente novamente com um dos seguintes comandos:\n 1) execute -u <argc>\n2) status\n");
         fflush(stdout);
     }
 
