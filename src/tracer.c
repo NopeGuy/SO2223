@@ -52,9 +52,9 @@ void itoa(int n, char s[])
 // funções primarias
 
 // calcula o tempo de execucao do pedido (fazer isto com os valores diretamente ou atraves da struct?)
-suseconds_t calcExec(pedido pedido)
+suseconds_t calcExec(pedido pedido,suseconds_t final)
 {
-    return (pedido.final - pedido.inicial)/1000;
+    return (final - pedido.inicial) / 1000;
 }
 
 // cria um novo fifo para o cliente (através do pid)
@@ -106,6 +106,51 @@ void escrevePID(pid_t pid)
     write(1, res, sizeof(res));
 }
 
+// leitura da resposta do servidor
+int leServidor(pid_t pid)
+{
+    int bytes_read,fd;
+    char pip[30],buffer[100];
+    snprintf(pip, sizeof(pip), "../fifos/pipe%d", pid);
+    fd = open(pip, O_RDONLY);
+    if (fd < 0)
+    {
+        fprintf(stderr,"erro no fd_read\n");
+        fflush(stderr);
+        return 1;
+    }
+
+    while ((bytes_read = read(fd, &buffer, sizeof(buffer))) > 0)
+    {
+        write(STDOUT_FILENO, buffer, bytes_read);
+    }
+    close(fd);
+    return 0;
+}
+
+int escreveServidor(pid_t pid,pedido pedido)
+{
+    int bytes_written,fd;
+    char pip[30];
+    snprintf(pip, sizeof(pip), "../fifos/pipe%d", pid);
+    fd = open(pip, O_WRONLY);
+    if (fd < 0)
+    {
+        fprintf(stderr,"erro no fd_read\n");
+        fflush(stderr);
+        return 1;
+    }
+
+    if(bytes_written = write(fd,&pedido,sizeof(pedido))<=0)
+    {
+        fprintf(stderr,"erro escrita servidor!\n");
+        fflush(stderr);
+        return 1;
+    }
+
+    return 0;
+}
+
 void execute(char *cmd, char **cmds)
 {
     pedido pedido;
@@ -122,7 +167,7 @@ void execute(char *cmd, char **cmds)
         // fechar o apontadores de leitura
         close(pedido_pai[0]);
 
-        escrevePID(getpid());
+        escrevePID(getppid());
 
         // adiciona o tempo inicial e o pid à struct pedido
         struct timeval inicial;
@@ -132,14 +177,17 @@ void execute(char *cmd, char **cmds)
         pedido.status = 0; // estado do pedido
         start = inicial.tv_usec;
         pedido.inicial = start;
-        pedido.pid = getpid();
+        pedido.pid = getppid();
         write(pedido_pai[1], &pedido, sizeof(pedido));
-        // falta fazer write para o servidor
+        
+        // fazer write do pedido semicompleto para o servidor
+        escreveServidor(getppid(),pedido);
+
 
         execvp(cmds[0], cmds);
 
-        printf("Programa com o pid %d não concluído!\n", getpid());
-        fflush(stdout);
+        fprintf(stderr,"Programa com o pid %d não concluído!\n", getppid());
+        fflush(stderr);
         _exit(1);
     }
     else if (pid == -1)
@@ -153,31 +201,30 @@ void execute(char *cmd, char **cmds)
             int bytes_read = read(pedido_pai[0], &pedido, sizeof(pedido));
             if (bytes_read == 0)
             {
-                printf("erro a ler do pedido_pai");
-                fflush(stdout);
+                fprintf(stderr,"erro a ler do pedido_pai");
+                fflush(stderr);
                 _exit(1);
             }
             pedido.status = 1;
 
+            //obter o tempo final de execução
             struct timeval final;
             gettimeofday(&final, NULL);
 
-            suseconds_t finish;
-            finish = final.tv_usec;
-            pedido.final = finish;
-
             // envia para o stdout o tempo de execução do pedido
             char resposta[25];
-            suseconds_t tempExec = calcExec(pedido);
+            suseconds_t tempExec = calcExec(pedido,final.tv_usec);
             snprintf(resposta, sizeof(resposta), "Ended in %ld ms\n", tempExec);
             write(STDOUT_FILENO, resposta, strlen(resposta));
 
+            //fazer write com o pedido completo para o servidor
+            escreveServidor(getpid(),pedido);
             _exit(0);
         }
         else
         {
-            printf("Erro de espera pelo filho %d\n", pid);
-            fflush(stdout);
+            fprintf(stderr,"Erro de espera pelo filho %d\n", pid);
+            fflush(stderr);
             _exit(1);
         }
     }
@@ -185,22 +232,12 @@ void execute(char *cmd, char **cmds)
 
 int main(int argc, char *argv[])
 {
-    /* Para testar sem recorrer ao servidor
-    int main_fd = open("../fifos/main", O_WRONLY); // Comunicação principal com o servidor (o servidor é responsável pela criação)
-    if (main_fd < 0)
-    {
-        printf("Erro ao abrir o main fifo!!!\n");
-        fflush(stdout);
-        return -1;
-    }
-    */
-
     // caso do execute
 
     if (argc > 2 && strcmp("execute", argv[1]) == 0 && strcmp(argv[2], "-u") == 0)
     {
         char *cmd;
-        
+
         cmd = extraiComandoString(argc, argv); // retira o "execute -u" do argc inicial
 
         char **cmds = malloc(sizeof(char *) * (argc - 3));
@@ -212,6 +249,31 @@ int main(int argc, char *argv[])
     // caso do status
     else if (argc == 2 && strcmp(argv[1], "status") == 0)
     {
+        // criação do pedido
+        int fd_read, bytes_read;
+        char buffer[100];
+        pedido pedido;
+        strcpy(pedido.commando, "status");
+        pedido.pid = getpid();
+
+        // envio do pedido para o servidor
+        int main_fd = open("../fifos/main", O_WRONLY);
+        if (main_fd < 0)
+        {
+            fprintf(stderr,"Erro ao abrir o main fifo!!!\n");
+            fflush(stderr);
+            return -1;
+        }
+
+        write(main_fd, &pedido, sizeof(pedido));
+        close(main_fd);
+
+        if(leServidor(getpid())==1)
+        {
+            fprintf(stderr,"erro leitura servidor!\n");
+            fflush(stderr);
+            return 1;
+        }
     }
     // caso de comando inválido
     else
