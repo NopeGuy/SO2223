@@ -52,7 +52,7 @@ void itoa(int n, char s[])
 // funções primarias
 
 // calcula o tempo de execucao do pedido (fazer isto com os valores diretamente ou atraves da struct?)
-time_t calcExec(pedido pedido)
+suseconds_t calcExec(pedido pedido)
 {
     return pedido.final - pedido.inicial;
 }
@@ -94,6 +94,16 @@ void extraiComandoArray(char **str, int argc, char *argv[])
     str[i] = '\0';
 }
 
+// Escreve para o stdout o pid que está a correr
+void escrevePID(pid_t pid)
+{
+    char res[35]="Running PID ";
+    char sPID[20];
+    itoa(pid, sPID);
+    strcat(res, sPID);
+    strcat(res,"\n");
+    write(1, res, sizeof(res));
+}
 // cria (struct)pedido com a informação
 /* Já não é necessario
 pedido criaPedido(pid_t pid, char *commando, time_t inicial,time_t final)
@@ -123,101 +133,81 @@ int main(int argc, char *argv[])
 
     if (argc > 2 && strcmp("execute", argv[1]) == 0 && strcmp(argv[2], "-u") == 0)
     {
-        // inteiro para guardar o stdout
-        int stdot;
         // Criação do pedido, já com o argc, status a 0
         pedido pedido;
-        pedido.status = 0; // estado do pedido
         int status = 0;
         pid_t pid;
-        struct timeval inicial, final; // struct auxiliar de gettimeofday
-        time_t start, finish;          // valores finais da timeval (o que se quer)
         char *cmd;
         cmd = extraiComandoString(argc, argv); // retira o "execute -u" do argc inicial
-        pedido.commando = cmd;
+        pedido.commando = cmd;//verificar
 
         char **cmds = malloc(sizeof(char *) * (argc - 3));
         extraiComandoArray(cmds,argc,argv); //poe dar merda
 
         // Criação de um pipe para comunicar o output para o pai
 
-        int fildes[2];
-        if (pipe(fildes) == -1)
+        int pedido_pai[2];
+        if (pipe(pedido_pai) == -1)
         {
-            perror("pipe do stdout do comando a executar");
+            perror("pedido_pai");
             _exit(1);
         }
 
         if ((pid = fork()) == 0)
         {
-            close(fildes[0]); // fechar o apontador de leitura (desnecessário)
+            // fechar o apontadores de leitura
+            close(pedido_pai[0]);
 
-            // Escreve para o stdout o pid que está a correr
-            char res[35]="Running PID ";
-            char sPID[20];
-            itoa(getpid(), sPID);
-            strcat(res, sPID);
-            strcat(res,"\n");
-            write(1, res, sizeof(res));
+            escrevePID(getpid());
 
-            // adiciona o tempo inicial e o pid à struct
+            // adiciona o tempo inicial e o pid à struct pedido
+            struct timeval inicial;
+            suseconds_t start;
             gettimeofday(&inicial, NULL);
+
+            pedido.status = 0; // estado do pedido
             start = inicial.tv_usec;
             pedido.inicial = start;
             pedido.pid = getpid();
+            write(pedido_pai[1],&pedido,sizeof(pedido));
+            //falta fazer write para o servidor
 
-            /* Para testar sem recorrer ao servidor             // escreve para o servidor a struct pedido com todos os valores menos o tempo final
-            write(main_fd, &pedido, sizeof(pedido));
-            close(main_fd);
-            */
-
-            // redirecionar o apontador do pipe fildes para o stdout
-
-            //guardar o apontador do stdout
-            dup2(STDOUT_FILENO,stdot);
-
-            //passar o fildes[1] a pontar para o stdout
-            dup2(fildes[1], STDOUT_FILENO);
-
-            execvp(cmds[0], cmds);                                           //está a peidar aqui aparently
+            execvp(cmds[0], cmds);                                           
             
             printf("Programa com o pid %d não concluído!\n", getpid());
             fflush(stdout);
             _exit(1);
         }
         else if (pid == -1)
-            perror("fork"); // caso dê erro no fork()
+            perror("fork");
         else
         {
-            // escrever o output do programa do filho para o stdout
-            //repor o stdout
-            dup2(stdot,STDOUT_FILENO);
-            close(fildes[1]); // fechar o extremo de escrita do output do argc
-            char buff[1024];
-            int bytes_read;
-            while ((bytes_read = read(fildes[0], &buff, sizeof(buff))) > 0)
-            {
-                write(STDOUT_FILENO, &buff, bytes_read);
-            }
-            close(fildes[0]); // fechar o extremo de leitura do output do argc do filho
-
             waitpid(pid, &status, 0);
             if (WIFEXITED(status))
             {
-                // adiciona o tempo final ao pedido
+                close(pedido_pai[1]);
+                int bytes_read = read(pedido_pai[0],&pedido,sizeof(pedido));
+                if(bytes_read == 0)
+                {
+                    printf("erro a ler do pedido_pai");
+                    fflush(stdout);
+                    _exit(1);
+                }
                 pedido.status = 1;
+
+                struct timeval final;
                 gettimeofday(&final, NULL);
+                
+                suseconds_t finish;
                 finish = final.tv_usec;
                 pedido.final = finish;
 
                 // envia para o stdout o tempo de execução do pedido
-                char resposta[20] = "Ended in ";
-                char *tempExec=calloc(30,sizeof(char));          //poe dar merda
-                itoa(calcExec(pedido), tempExec);
-                strcat(resposta, tempExec);
-                strcat(resposta, " ms\n");
+                char resposta[25];
+                suseconds_t tempExec = calcExec(pedido);
+                snprintf(resposta, sizeof(resposta), "Ended in %ld ms\n", tempExec);
+                write(STDOUT_FILENO, resposta, strlen(resposta));
 
-                write(STDOUT_FILENO, &resposta, sizeof(resposta));
                 _exit(0);
             }
             else
@@ -239,7 +229,7 @@ int main(int argc, char *argv[])
 
 
     }
-    // caso de argc inválido
+    // caso de comando inválido
     else
     {
         printf("\nComando inválido, por favor execute o cliente novamente com um dos seguintes comandos:\n 1) execute -u <argc>\n2) status\n");

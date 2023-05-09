@@ -5,8 +5,8 @@
 typedef struct pedido{
     pid_t pid;
     char *commando;
-    time_t inicial;
-    time_t final;
+    suseconds_t inicial;
+    suseconds_t final;
     int status; // 0 - nao acabou | 1 - acabou
 }pedido;
 
