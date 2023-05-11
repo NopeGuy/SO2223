@@ -6,7 +6,6 @@ typedef struct pedido{
     pid_t pid;
     char *commando;
     suseconds_t inicial;
-    int status; // 0 - nao acabou | 1 - acabou
 }pedido;
 
 int criaLigacao(pid_t pid);

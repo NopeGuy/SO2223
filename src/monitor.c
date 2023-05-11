@@ -52,20 +52,6 @@ int main(int argc, char **argv)
             {
                 if (global[j].pid == pedido.pid)
                 {
-                    char file[64];
-                    snprintf(file, sizeof(file), "%s/%d.txt", argv[1], global[j].pid);
-                    int fd_pids = open(file, O_CREAT | O_WRONLY, 0666);
-
-                    char str1[128];
-                    snprintf(str1, sizeof(str1), "%ld\n", pedido.final - pedido.inicial);
-                    write(fd_pids, str1, strlen(str1));
-
-                    char str2[260];
-                    snprintf(str2, sizeof(str2), "%s\n", global[j].commando);
-                    int a = write(fd_pids, str2, strlen(str2));
-
-                    close(fd_pids);
-
                     global[j] = global[pos - 1];
                     pos--;
                     flag = 1;
