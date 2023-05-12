@@ -12,6 +12,7 @@
 
 // funcoes auxiliares
 #define MAX_STRING_LENGTH 20
+char buffer[MAX_STRING_LENGTH];
 
 void reverse(char s[])
 {
@@ -57,6 +58,18 @@ suseconds_t calcExec(pedido pedido, suseconds_t final)
     return (final - pedido.inicial) / 1000;
 }
 
+// cria um novo fifo para o cliente (através do pid)
+int criaLigacao(pid_t pid)
+{
+    char *temp = "../fifos/";
+    char *cPid = malloc(sizeof(pid_t));
+    itoa(pid, cPid);
+    strcat(temp, cPid);
+    if (mkfifo(temp, 0666) == 0)
+        return 0;
+    return -1;
+}
+
 // copia apenas a parte do argc relevante para posteriormente acopular à struct pedido
 char *extraiComandoString(int argc, char **argv)
 {
@@ -94,11 +107,37 @@ void escrevePID(pid_t pid)
     write(1, res, sizeof(res));
 }
 
-void execute(char *cmd, char **cmds)
+// leitura da resposta do servidor
+int leServidor(int fd, pid_t pid)
+{
+    int bytes_read;
+
+    while ((bytes_read = read(fd, &buffer, sizeof(buffer))) > 0)
+    {
+        write(STDOUT_FILENO, buffer, bytes_read);
+    }
+    close(fd);
+    return 0;
+}
+
+int escreveServidor(pedido pedido)
+{
+    int bytes_written, fd;
+
+    if ((bytes_written = write(fd, &pedido, sizeof(pedido))) == 0) // faco assim a verificacao?
+    {
+        fprintf(stderr, "erro escrita servidor!\n");
+        fflush(stderr);
+        return 1;
+    }
+    return 0;
+}
+
+void execute(int write_fd, char *cmd, char **cmds)
 {
     pedido pedido;
     pid_t pid;
-    int pedido_pai[2], status = 0, bytes_written, main_fd;
+    int pedido_pai[2], status = 0, bytes_written;
     if (pipe(pedido_pai) == -1)
     {
         perror("pedido_pai");
@@ -114,29 +153,22 @@ void execute(char *cmd, char **cmds)
 
         // adiciona o tempo inicial e o pid à struct pedido
         struct timeval inicial;
+        suseconds_t start;
         gettimeofday(&inicial, NULL);
 
-        pedido.inicial = inicial.tv_usec;
+        start = inicial.tv_usec;
+        pedido.inicial = start;
         pedido.pid = getppid();
         write(pedido_pai[1], &pedido, sizeof(pedido));
 
         // fazer write do pedido semicompleto para o servidor
 
-        main_fd = open("../fifos/main", O_WRONLY);
-        if (main_fd < 0)
-        {
-            fprintf(stderr, "Erro ao abrir o main fifo!!!\n");
-            fflush(stderr);
-            _exit(1);
-        }
-
-        if ((bytes_written = write(main_fd, &pedido, sizeof(pedido))) == 0) // faco assim a verificacao?
+        if ((bytes_written = write(write_fd, &pedido, sizeof(pedido))) == 0) // faco assim a verificacao?
         {
             fprintf(stderr, "erro escrita servidor!\n");
             fflush(stderr);
+            _exit(1);
         }
-
-        close(main_fd);
 
         execvp(cmds[0], cmds);
 
@@ -159,7 +191,6 @@ void execute(char *cmd, char **cmds)
                 fflush(stderr);
                 _exit(1);
             }
-            close(pedido_pai[0]);
 
             // obter o tempo final de execução
             struct timeval final;
@@ -171,21 +202,14 @@ void execute(char *cmd, char **cmds)
             snprintf(resposta, sizeof(resposta), "Ended in %ld ms\n", tempExec);
             write(STDOUT_FILENO, resposta, strlen(resposta));
 
-            main_fd = open("../fifos/main", O_WRONLY);
-            if (main_fd < 0)
-            {
-                fprintf(stderr, "Erro ao abrir o main fifo!!!\n");
-                fflush(stderr);
-                _exit(1);
-            }
-
             // fazer write novamente do pedido para este ser eliminado
-            if ((bytes_written = write(main_fd, &pedido, sizeof(pedido))) == 0) // faco assim a verificacao?
+            /*
+            if ((bytes_written = write(write_fd, &pedido, sizeof(pedido))) == 0) // faco assim a verificacao?
             {
                 fprintf(stderr, "erro escrita servidor!\n");
                 fflush(stderr);
-            }
-            close(main_fd);
+                _exit(1);
+            }*/
             _exit(0);
         }
         else
@@ -200,11 +224,11 @@ void execute(char *cmd, char **cmds)
 int main(int argc, char *argv[])
 {
     // caso do execute
-    int main_fd, bytes_read, bytes_written;
+    int write_fd, read_fd, bytes_read, bytes_written;
 
     if (argc > 2 && strcmp("execute", argv[1]) == 0 && strcmp(argv[2], "-u") == 0)
     {
-        main_fd = open("../fifos/main", O_RDWR);
+        write_fd = open("../fifos/read", O_WRONLY);
         char *cmd;
 
         cmd = extraiComandoString(argc, argv); // retira o "execute -u" do argc inicial
@@ -212,7 +236,7 @@ int main(int argc, char *argv[])
         char **cmds = malloc(sizeof(char *) * (argc - 3));
         extraiComandoArray(cmds, argc, argv);
 
-        execute(cmd, cmds);
+        execute(write_fd, cmd, cmds);
     }
 
     // caso do status
@@ -220,33 +244,27 @@ int main(int argc, char *argv[])
     {
         // criação do pedido
         pedido pedido;
-        pedido.commando = "";
         strcpy(pedido.commando, "status");
         pedido.pid = getpid();
 
         // envio do pedido para o servidor
-        main_fd = open("../fifos/main", O_RDWR);
-        if (main_fd < 0)
+        write_fd = open("../fifos/read", O_WRONLY);
+        if (write_fd < 0)
         {
             fprintf(stderr, "Erro ao abrir o main fifo!!!\n");
             fflush(stderr);
             return -1;
         }
 
-        if ((bytes_written = write(main_fd, &pedido, sizeof(pedido))) == 0)
-        {
-            fprintf(stderr, "Erro ao escrever o pedido para o fifo!!!\n");
-            fflush(stderr);
-            _exit(1);
-        }
+        write(write_fd, &pedido, (sizeof(pedido))*2);
+        close(write_fd);
 
-        char buffer[100];
-
-        while ((bytes_read = read(main_fd, &buffer, sizeof(buffer))) > 0)
+        read_fd = open("../fifos/write", O_RDONLY);
+        while ((bytes_read = read(read_fd, &buffer, sizeof(buffer))) > 0)
         {
             write(STDOUT_FILENO, buffer, bytes_read);
         }
-        close(main_fd);
+        close(read_fd);
     }
     // caso de comando inválido
     else

@@ -4,7 +4,7 @@
 
 typedef struct pedido{
     pid_t pid;
-    char *commando;
+    char commando[60];
     suseconds_t inicial;
 }pedido;
 
@@ -13,7 +13,6 @@ char* extraiComandoString(int argc,char** argv);
 void extraiComandoArray(char** str, int argc, char* argv[]);
 pedido criaPedido(pid_t pid, char *commando, time_t inicial,time_t final);
 time_t calcExec(pedido pedido,suseconds_t final);
-
 
 
 #endif
