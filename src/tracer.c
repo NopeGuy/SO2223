@@ -58,18 +58,6 @@ suseconds_t calcExec(pedido pedido)
     return (pedido.final.tv_usec - pedido.inicial.tv_usec) / 1000;
 }
 
-// cria um novo fifo para o cliente (através do pid)
-int criaLigacao(pid_t pid)
-{
-    char *temp = "../fifos/";
-    char *cPid = malloc(sizeof(pid_t));
-    itoa(pid, cPid);
-    strcat(temp, cPid);
-    if (mkfifo(temp, 0666) == 0)
-        return 0;
-    return -1;
-}
-
 // copia apenas a parte do argc relevante para posteriormente acopular à struct pedido
 char *extraiComandoString(int argc, char **argv)
 {
@@ -105,32 +93,6 @@ void escrevePID(pid_t pid)
     strcat(res, sPID);
     strcat(res, "\n");
     write(1, res, sizeof(res));
-}
-
-// leitura da resposta do servidor
-int leServidor(int fd, pid_t pid)
-{
-    int bytes_read;
-
-    while ((bytes_read = read(fd, &buffer, sizeof(buffer))) > 0)
-    {
-        write(STDOUT_FILENO, buffer, bytes_read);
-    }
-    close(fd);
-    return 0;
-}
-
-int escreveServidor(pedido pedido)
-{
-    int bytes_written, fd;
-
-    if ((bytes_written = write(fd, &pedido, sizeof(pedido))) == 0) // faco assim a verificacao?
-    {
-        fprintf(stderr, "erro escrita servidor!\n");
-        fflush(stderr);
-        return 1;
-    }
-    return 0;
 }
 
 void execute(int write_fd, char *cmd, char **cmds)

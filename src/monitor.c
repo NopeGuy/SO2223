@@ -12,6 +12,11 @@
 pedido global[100]; //array para guardar os pedidos
 int pos=0; //ultima posicao no array global
 
+suseconds_t calcExec(pedido pedido)
+{
+    return (pedido.final.tv_usec - pedido.inicial.tv_usec) / 1000;
+}
+
 void status(pedido global[], int N)
 {
     struct timeval now;
@@ -35,7 +40,7 @@ int main(int argc, char *argv[])
     struct stat sb;
     if(argc>1 && stat(argv[1],&sb) == 0 && S_ISDIR(sb.st_mode))
     {
-    char pids_folder = argv[1];
+    char *pids_folder = argv[1];
     memset(global, 0, sizeof(global));
     int res_fifo, res_fifo2, fd_read, fd_write, bytes_read;
     pedido pedido;
@@ -75,9 +80,9 @@ int main(int argc, char *argv[])
                 {
                     //escrita em ficheiro
                     char f[100],tempo[100],cmd[100];
-                    snprintf(f, sizeof(f), "../%s/%d.txt", pids_folder, global[j].pid);
+                    snprintf(f, sizeof(f), "%s/%d.txt", pids_folder, global[j].pid);
                     int file = open(f, O_CREAT | O_WRONLY, 0666);
-                    snprintf(tempo,sizeof(tempo),"%d\n",calcExec(global[j]));
+                    snprintf(tempo,sizeof(tempo),"%ld\n",calcExec(global[j]));
                     snprintf(cmd,sizeof(cmd),"%s\n",global[j].commando);
                     write(file,tempo,strlen(tempo));
                     write(file,cmd,strlen(cmd));
