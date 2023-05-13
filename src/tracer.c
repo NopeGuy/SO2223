@@ -119,6 +119,9 @@ void execute(int write_fd, char *cmd, char **cmds)
 
         pedido.inicial = inicial;
         pedido.pid = getppid();
+        strcpy(pedido.commando, cmd);
+        pedido.final.tv_sec=0;
+        pedido.final.tv_usec=0;
         write(pedido_pai[1], &pedido, sizeof(pedido));
 
         // fazer write do pedido semicompleto para o servidor
@@ -163,7 +166,7 @@ void execute(int write_fd, char *cmd, char **cmds)
             write(STDOUT_FILENO, resposta, strlen(resposta));
 
             // fazer write novamente do pedido para este ser eliminado
-            if ((bytes_written = write(write_fd, &pedido, sizeof(pedido))) == 0) // faco assim a verificacao?
+            if ((bytes_written = write(write_fd, &pedido, sizeof(pedido))) == 0)
             {
                 fprintf(stderr, "erro escrita servidor!\n");
                 fflush(stderr);
@@ -190,7 +193,7 @@ int main(int argc, char *argv[])
         write_fd = open("../fifos/read", O_WRONLY);
         char *cmd;
 
-        cmd = extraiComandoString(argc, argv); // retira o "execute -u" do argc inicial
+        cmd = extraiComandoString(argc, argv); // retira o "execute -u" do commando inicial
 
         char **cmds = malloc(sizeof(char *) * (argc - 3));
         extraiComandoArray(cmds, argc, argv);

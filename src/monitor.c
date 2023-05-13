@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
         _exit(1);
     }
 
-    while ((bytes_read = read(fd_read, &pedido, (sizeof(pedido))*2)) > 0)
+    while ((bytes_read = read(fd_read, &pedido, (sizeof(pedido)))) > 0)
     {
         if (!strcmp(pedido.commando, "status"))
         {
@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
                 if (global[j].pid == pedido.pid)
                 {
                     //escrita em ficheiro
-                    char f[100],tempo[100],cmd[100];
+                    char f[100],tempo[200],cmd[200];
                     snprintf(f, sizeof(f), "%s/%d.txt", pids_folder, global[j].pid);
                     int file = open(f, O_CREAT | O_WRONLY, 0666);
                     snprintf(tempo,sizeof(tempo),"%ld\n",calcExec(global[j]));
