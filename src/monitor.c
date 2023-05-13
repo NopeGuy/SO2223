@@ -17,9 +17,9 @@ suseconds_t calcExecMonitor(struct pedido pedido,struct pedido global)
     return ((pedido.final.tv_usec - global.inicial.tv_usec)/1000 + (pedido.final.tv_sec - global.inicial.tv_sec)*1000);
 }
 
-suseconds_t calcExec(pedido pedido)
+suseconds_t calcExec(pedido pedido,struct timeval now)
 {
-    return (pedido.final.tv_usec - pedido.inicial.tv_usec)/1000 + (pedido.final.tv_sec - pedido.inicial.tv_sec)*1000;
+    return (now.tv_usec - pedido.inicial.tv_usec)/1000 + (now.tv_sec - pedido.inicial.tv_sec)*1000;
 }
 
 void status(pedido global[], int N)
