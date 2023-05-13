@@ -21,7 +21,7 @@ void status(pedido global[], int N)
 
     for (int i = 0; i < N; i++)
     {
-        suseconds_t elapsed = (now.tv_sec - global[i].inicial / 1000) * 1000 + (now.tv_usec - global[i].inicial % 1000) / 1000;
+        suseconds_t elapsed = (now.tv_usec-global[i].inicial.tv_usec)/1000 + (now.tv_sec-global[i].inicial.tv_sec)*1000;
         char resposta[100];
         snprintf(resposta, sizeof(resposta), "Pid:%d encontra-se em execução há %ld ms\n", global[i].pid, elapsed);
         write(fd, resposta, strlen(resposta));

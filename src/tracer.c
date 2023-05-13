@@ -55,7 +55,7 @@ void itoa(int n, char s[])
 // calcula o tempo de execucao do pedido (fazer isto com os valores diretamente ou atraves da struct?)
 suseconds_t calcExec(pedido pedido, suseconds_t final)
 {
-    return (final - pedido.inicial) / 1000;
+    return (final - pedido.inicial.tv_usec) / 1000;
 }
 
 // cria um novo fifo para o cliente (através do pid)
@@ -153,11 +153,9 @@ void execute(int write_fd, char *cmd, char **cmds)
 
         // adiciona o tempo inicial e o pid à struct pedido
         struct timeval inicial;
-        suseconds_t start;
         gettimeofday(&inicial, NULL);
 
-        start = inicial.tv_usec;
-        pedido.inicial = start;
+        pedido.inicial = inicial;
         pedido.pid = getppid();
         write(pedido_pai[1], &pedido, sizeof(pedido));
 

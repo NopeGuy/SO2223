@@ -5,7 +5,7 @@
 typedef struct pedido{
     pid_t pid;
     char commando[60];
-    suseconds_t inicial;
+    struct timeval inicial;
 }pedido;
 
 int criaLigacao(pid_t pid);
