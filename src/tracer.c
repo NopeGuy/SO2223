@@ -53,9 +53,9 @@ void itoa(int n, char s[])
 // funções primarias
 
 // calcula o tempo de execucao do pedido (fazer isto com os valores diretamente ou atraves da struct?)
-suseconds_t calcExec(pedido pedido, suseconds_t final)
+suseconds_t calcExec(pedido pedido)
 {
-    return (final - pedido.inicial.tv_usec) / 1000;
+    return (pedido.final.tv_usec - pedido.inicial.tv_usec) / 1000;
 }
 
 // cria um novo fifo para o cliente (através do pid)
@@ -193,21 +193,20 @@ void execute(int write_fd, char *cmd, char **cmds)
             // obter o tempo final de execução
             struct timeval final;
             gettimeofday(&final, NULL);
-
+            pedido.final=final;
             // envia para o stdout o tempo de execução do pedido
             char resposta[25];
-            suseconds_t tempExec = calcExec(pedido, final.tv_usec);
+            suseconds_t tempExec = calcExec(pedido);
             snprintf(resposta, sizeof(resposta), "Ended in %ld ms\n", tempExec);
             write(STDOUT_FILENO, resposta, strlen(resposta));
 
             // fazer write novamente do pedido para este ser eliminado
-            /*
             if ((bytes_written = write(write_fd, &pedido, sizeof(pedido))) == 0) // faco assim a verificacao?
             {
                 fprintf(stderr, "erro escrita servidor!\n");
                 fflush(stderr);
                 _exit(1);
-            }*/
+            }
             _exit(0);
         }
         else
