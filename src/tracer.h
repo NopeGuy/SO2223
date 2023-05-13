@@ -8,11 +8,12 @@ typedef struct pedido{
     struct timeval inicial,final;
 }pedido;
 
-int criaLigacao(pid_t pid);
+void escrevePID(pid_t pid);
 char* extraiComandoString(int argc,char** argv);
 void extraiComandoArray(char** str, int argc, char* argv[]);
 pedido criaPedido(pid_t pid, char *commando, time_t inicial,time_t final);
 suseconds_t calcExec(pedido pedido);
+void execute(int write_fd, char *cmd, char **cmds);
 
 
 #endif

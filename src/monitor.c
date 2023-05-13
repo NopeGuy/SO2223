@@ -12,9 +12,14 @@
 pedido global[100]; //array para guardar os pedidos
 int pos=0; //ultima posicao no array global
 
+suseconds_t calcExecMonitor(struct pedido pedido,struct pedido global)
+{
+    return ((pedido.final.tv_usec - global.inicial.tv_usec)/1000 + (pedido.final.tv_sec - global.inicial.tv_sec)*1000);
+}
+
 suseconds_t calcExec(pedido pedido)
 {
-    return (pedido.final.tv_usec - pedido.inicial.tv_usec) / 1000;
+    return (pedido.final.tv_usec - pedido.inicial.tv_usec)/1000 + (pedido.final.tv_sec - pedido.inicial.tv_sec)*1000;
 }
 
 void status(pedido global[], int N)
@@ -26,7 +31,7 @@ void status(pedido global[], int N)
 
     for (int i = 0; i < N; i++)
     {
-        suseconds_t elapsed = (now.tv_usec-global[i].inicial.tv_usec)/1000 + (now.tv_sec-global[i].inicial.tv_sec)*1000;
+        suseconds_t elapsed = calcExec(global[i]);
         char resposta[100];
         snprintf(resposta, sizeof(resposta), "%d %s %ld ms\n", global[i].pid,global[i].commando, elapsed);
         write(fd, resposta, strlen(resposta));
@@ -82,7 +87,7 @@ int main(int argc, char *argv[])
                     char f[100],tempo[200],cmd[200];
                     snprintf(f, sizeof(f), "%s/%d.txt", pids_folder, global[j].pid);
                     int file = open(f, O_CREAT | O_WRONLY, 0666);
-                    snprintf(tempo,sizeof(tempo),"%ld\n",calcExec(global[j]));
+                    snprintf(tempo,sizeof(tempo),"%ld\n",calcExecMonitor(pedido,global[j]));
                     snprintf(cmd,sizeof(cmd),"%s\n",global[j].commando);
                     write(file,tempo,strlen(tempo));
                     write(file,cmd,strlen(cmd));

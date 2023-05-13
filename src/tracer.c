@@ -55,7 +55,7 @@ void itoa(int n, char s[])
 // calcula o tempo de execucao do pedido (fazer isto com os valores diretamente ou atraves da struct?)
 suseconds_t calcExec(pedido pedido)
 {
-    return (pedido.final.tv_usec - pedido.inicial.tv_usec) / 1000;
+    return (pedido.final.tv_usec - pedido.inicial.tv_usec)/1000 + (pedido.final.tv_sec - pedido.inicial.tv_sec)*1000;
 }
 
 // copia apenas a parte do argc relevante para posteriormente acopular à struct pedido
@@ -218,7 +218,7 @@ int main(int argc, char *argv[])
             return -1;
         }
 
-        write(write_fd, &pedido, (sizeof(pedido))*2);
+        write(write_fd, &pedido, (sizeof(pedido)));
         close(write_fd);
 
         read_fd = open("../fifos/write", O_RDONLY);
