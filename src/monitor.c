@@ -31,7 +31,7 @@ void status(pedido global[], int N)
 
     for (int i = 0; i < N; i++)
     {
-        suseconds_t elapsed = calcExec(global[i]);
+        suseconds_t elapsed = calcExec(global[i],now);
         char resposta[100];
         snprintf(resposta, sizeof(resposta), "%d %s %ld ms\n", global[i].pid,global[i].commando, elapsed);
         write(fd, resposta, strlen(resposta));
