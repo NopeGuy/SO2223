@@ -1,3 +1,2 @@
 # SO2223
-Trabalho de SO (not finished):
-Por acabar
+Trabalho de Sistemas Operativos
